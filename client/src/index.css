@@ -1,0 +1,164 @@
+
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+
+  --bg: #ffffff;
+  --surface: #f4f5f8;
+  --text: #171923;
+  --muted: #666b78;
+  --border: #dedfe5;
+  --accent: #7c3aed;
+  --button-text: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1117;
+  --surface: #191d27;
+  --text: #f3f4f6;
+  --muted: #a0a5b2;
+  --border: #303441;
+  --accent: #a78bfa;
+  --button-text: #ffffff;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-container {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-header {
+  min-height: 75px;
+  padding: 14px 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 15px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-logo {
+  margin: 0;
+  color: var(--text);
+  font-size: 23px;
+}
+
+.theme-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-controls button {
+  padding: 9px 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-controls button.active {
+  background: var(--accent);
+  color: var(--button-text);
+  border-color: var(--accent);
+}
+
+h1,
+h2,
+h3,
+p,
+label {
+  color: var(--text);
+}
+
+input,
+textarea,
+select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+@media (max-width: 600px) {
+  .theme-header {
+    justify-content: center;
+  }
+
+  .theme-controls {
+    justify-content: center;
+  }
+}
+
+.login-page {
+  min-height: calc(100vh - 75px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 400px;
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.login-form h1 {
+  font-size: 28px;
+  margin: 0 0 12px;
+}
+
+.login-form input {
+  padding: 12px;
+}
+
+.login-form button {
+  padding: 13px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+}
+
+.login-error {
+  color: #ef4444;
+}

@@ -1,0 +1,293 @@
+.downloads-page {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 32px 24px 56px;
+  color: #202124;
+  font-family: Arial, sans-serif;
+}
+
+.downloads-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.downloads-eyebrow {
+  margin: 0 0 8px;
+  color: #666;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.downloads-header h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 36px);
+}
+
+.downloads-subtitle {
+  margin: 10px 0 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.downloads-refresh,
+.downloads-error button {
+  padding: 10px 16px;
+  border: 1px solid #d5d7da;
+  border-radius: 8px;
+  background: #fff;
+  color: #202124;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.downloads-refresh:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.downloads-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.downloads-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.downloads-stat span {
+  color: #666;
+  font-size: 14px;
+}
+
+.downloads-stat strong {
+  font-size: 28px;
+}
+
+.downloads-stat small {
+  color: #777;
+}
+
+.downloads-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.downloads-filter {
+  padding: 10px 15px;
+  border: 1px solid #dedfe3;
+  border-radius: 24px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.downloads-filter.active {
+  border-color: #242424;
+  background: #242424;
+  color: #fff;
+}
+
+.downloads-list {
+  display: grid;
+  gap: 16px;
+}
+
+.download-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.download-thumbnail {
+  flex: 0 0 190px;
+  width: 190px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f0f1f3;
+}
+
+.download-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.download-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background: #eceef1;
+  color: #555;
+  font-size: 28px;
+}
+
+.download-details {
+  min-width: 0;
+  flex: 1;
+}
+
+.download-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.download-title-row h2 {
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.download-status {
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: #eee;
+  color: #444;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.status-completed {
+  background: #e5f5e9;
+  color: #176b35;
+}
+
+.status-failed {
+  background: #fde8e7;
+  color: #a3221b;
+}
+
+.status-in_progress {
+  background: #fff1d6;
+  color: #805600;
+}
+
+.download-date {
+  margin: 12px 0 8px;
+  color: #62666b;
+  font-size: 14px;
+}
+
+.download-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: #555;
+  font-size: 13px;
+}
+
+.download-result,
+.download-failed {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.download-result {
+  color: #176b35;
+}
+
+.download-failed {
+  color: #a3221b;
+  overflow-wrap: anywhere;
+}
+
+.download-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.download-progress progress {
+  width: min(300px, 80%);
+}
+
+.download-message,
+.download-empty {
+  padding: 36px 20px;
+  text-align: center;
+  color: #666;
+}
+
+.downloads-error {
+  padding: 20px;
+  border: 1px solid #f0c6c3;
+  border-radius: 10px;
+  background: #fff7f6;
+  color: #8f211a;
+}
+
+.downloads-empty {
+  padding: 48px 20px;
+  border: 1px dashed #d5d7da;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.downloads-empty h2 {
+  margin: 12px 0 8px;
+  font-size: 20px;
+}
+
+.downloads-empty p {
+  color: #666;
+}
+
+.downloads-empty-icon {
+  font-size: 36px;
+}
+
+@media (max-width: 650px) {
+  .downloads-page {
+    padding: 24px 14px 40px;
+  }
+
+  .downloads-header {
+    align-items: flex-start;
+  }
+
+  .downloads-summary {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .downloads-stat {
+    padding: 15px;
+  }
+
+  .download-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .download-thumbnail {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .download-title-row h2 {
+    font-size: 17px;
+  }
+}

@@ -1,0 +1,267 @@
+
+.plans-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 24px 56px;
+  color: #202124;
+  font-family: Arial, sans-serif;
+}
+
+.plans-header {
+  max-width: 700px;
+  margin: 0 auto 28px;
+  text-align: center;
+}
+
+.plans-eyebrow {
+  color: #666;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.plans-header h1 {
+  margin: 12px 0;
+  font-size: clamp(30px, 5vw, 42px);
+}
+
+.plans-header > p:last-child {
+  color: #666;
+  line-height: 1.7;
+}
+
+.plans-period-picker {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 28px 0;
+}
+
+.plans-period {
+  padding: 11px 20px;
+  border: 1px solid #d9dce1;
+  border-radius: 24px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+}
+
+.plans-period.active {
+  background: #202124;
+  border-color: #202124;
+  color: #fff;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 22px 18px;
+  border: 1px solid #e0e2e6;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.plan-gold {
+  border-color: #b8a16a;
+}
+
+.plan-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.plan-card h2 {
+  margin: 0;
+  font-size: 23px;
+}
+
+.plan-tag {
+  padding: 5px 8px;
+  border-radius: 20px;
+  background: #f5edda;
+  color: #6d531c;
+  font-size: 11px;
+}
+
+.plan-description {
+  min-height: 44px;
+  color: #666;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.plan-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 4px;
+}
+
+.plan-price strong {
+  font-size: 27px;
+  overflow-wrap: anywhere;
+}
+
+.plan-price span {
+  color: #666;
+  font-size: 12px;
+}
+
+.plan-configuration-note {
+  min-height: 32px;
+  color: #8a5a00;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.plan-validity {
+  min-height: 18px;
+  color: #666;
+  font-size: 12px;
+}
+
+.plan-select-button {
+  width: 100%;
+  margin: 12px 0 20px;
+  padding: 11px 8px;
+  border: 1px solid #252525;
+  border-radius: 8px;
+  background: #252525;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plan-select-button:hover {
+  opacity: 0.88;
+}
+
+.plan-benefits {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-benefits li {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 0;
+  border-top: 1px solid #eceef1;
+}
+
+.plan-feature-label {
+  color: #777;
+  font-size: 12px;
+}
+
+.plan-feature-value {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.plan-selection-message {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #d9dce1;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.plan-selection-message h2 {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+.plan-selection-message p {
+  color: #555;
+  line-height: 1.6;
+}
+
+.plans-comparison {
+  margin-top: 44px;
+}
+
+.plans-comparison h2 {
+  margin-bottom: 18px;
+  font-size: 24px;
+}
+
+.plans-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e0e2e6;
+  border-radius: 10px;
+}
+
+.plans-table-wrapper table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.plans-table-wrapper th,
+.plans-table-wrapper td {
+  padding: 15px 16px;
+  border-bottom: 1px solid #e8eaed;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.plans-table-wrapper thead th {
+  background: #f5f6f8;
+}
+
+.plans-table-wrapper tbody th {
+  font-weight: 600;
+}
+
+.plans-table-wrapper tbody tr:last-child th,
+.plans-table-wrapper tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.plans-disclaimer {
+  margin-top: 24px;
+  color: #6b6b6b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 1000px) {
+  .plans-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .plans-page {
+    padding: 24px 14px 40px;
+  }
+
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-description,
+  .plan-configuration-note,
+  .plan-validity {
+    min-height: 0;
+  }
+}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConnectRoom Dashboard</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6fb;
+            color: #182033;
+        }
+        header {
+            background: #171c35;
+            color: white;
+            padding: 20px 6%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h2 { margin: 0; }
+        button {
+            border: 0;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 15px;
+            cursor: pointer;
+            background: #5b5cf0;
+            color: white;
+        }
+        .logout { background: #e64b62; }
+        main {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .welcome, .panel {
+            background: white;
+            padding: 26px;
+            border-radius: 14px;
+            margin-bottom: 22px;
+            box-shadow: 0 5px 20px #17213b0b;
+        }
+        .welcome h1 { margin-top: 0; }
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 20px;
+        }
+        .actions .panel { margin: 0; }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 12px 0;
+            border: 1px solid #d5d9e5;
+            border-radius: 8px;
+        }
+        #message { margin-top: 12px; color: #d33b50; }
+        .muted { color: #65708a; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>ConnectRoom</h2>
+        <button class="logout" id="logoutButton">Log Out</button>
+    </header>
+
+    <main>
+        <section class="welcome">
+            <h1 id="welcomeText">Welcome!</h1>
+            <p class="muted">Create a meeting or join one using a room ID.</p>
+        </section>
+
+        <section class="actions">
+            <div class="panel">
+                <h2>Create a Meeting</h2>
+                <p class="muted">Generate a room ID for your meeting.</p>
+                <button id="createButton">Create Meeting</button>
+            </div>
+
+            <div class="panel">
+                <h2>Join a Meeting</h2>
+                <p class="muted">Enter the room ID shared with you.</p>
+                <input id="roomInput" placeholder="Enter room ID">
+                <button id="joinButton">Join Meeting</button>
+                <p id="message"></p>
+            </div>
+        </section>
+
+        <section class="panel" style="margin-top:22px">
+            <h2>Recent Meetings</h2>
+            <p class="muted" id="recentMeetings">No meetings yet. Create your first meeting.</p>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem("token");
+        const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+
+        if (!token) {
+            window.location.href = "/login.html";
+        } else {
+            const name = storedUser?.name || "User";
+            document.getElementById("welcomeText").textContent = "Welcome, " + name;
+        }
+
+        function openRoom(roomId) {
+            const recent = JSON.parse(localStorage.getItem("recentMeetings") || "[]");
+            if (!recent.includes(roomId)) {
+                recent.unshift(roomId);
+            }
+            localStorage.setItem("recentMeetings", JSON.stringify(recent.slice(0, 5)));
+            window.location.href = "/room.html?room=" + encodeURIComponent(roomId);
+        }
+
+        document.getElementById("createButton").addEventListener("click", () => {
+            const roomId = "ROOM-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+            openRoom(roomId);
+        });
+
+        document.getElementById("joinButton").addEventListener("click", () => {
+            const roomId = document.getElementById("roomInput").value.trim();
+            const message = document.getElementById("message");
+
+            if (!roomId) {
+                message.textContent = "Please enter a room ID.";
+                return;
+            }
+
+            openRoom(roomId);
+        });
+
+        document.getElementById("logoutButton").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            window.location.href = "/login.html";
+        });
+
+        const recent = JSON.parse(localStorage.getItem("recentMeetings") || "[]");
+        if (recent.length) {
+            const container = document.getElementById("recentMeetings");
+            container.textContent = "";
+            recent.forEach((roomId) => {
+                const button = document.createElement("button");
+                button.textContent = roomId;
+                button.style.margin = "5px";
+                button.addEventListener("click", () => openRoom(roomId));
+                container.appendChild(button);
+            });
+        }
+    </script>
+</body>
+</html>

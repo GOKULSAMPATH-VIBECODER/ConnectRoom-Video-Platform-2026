@@ -1,0 +1,247 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ConnectRoom | Login</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      padding: 20px; font-family: "Segoe UI", Arial, sans-serif;
+      color: #edf2ff;
+      background: radial-gradient(circle at top left, #29366d, #0b1020 60%);
+    }
+    .card {
+      width: 100%; max-width: 420px; padding: 30px;
+      background: #141c2e; border: 1px solid #34415e;
+      border-radius: 18px; box-shadow: 0 20px 60px #0005;
+    }
+    h1 { margin: 0 0 8px; font-size: 27px; }
+    .brand { color: #8994ff; }
+    .subtitle { color: #a8b5ce; margin-bottom: 25px; }
+    label { display: block; margin: 15px 0 7px; font-size: 14px; }
+    input {
+      width: 100%; padding: 12px; color: #edf2ff;
+      background: #0b1220; border: 1px solid #35415c;
+      border-radius: 9px; outline: none;
+    }
+    input:focus { border-color: #8994ff; }
+    button {
+      width: 100%; margin-top: 20px; padding: 12px;
+      border: 0; border-radius: 9px; color: white;
+      background: #6d7cff; font-size: 15px; font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    .switch {
+      margin-top: 18px; text-align: center;
+      color: #b9c4dc; font-size: 14px;
+    }
+    .switch a { color: #a7b0ff; cursor: pointer; }
+    #message { margin-top: 14px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+    .error { color: #ff9b9b; }
+    .success { color: #93edba; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Connect<span class="brand">Room</span></h1>
+    <p class="subtitle" id="subtitle">Sign in to join your video meetings.</p>
+
+    <form id="authForm">
+      <div id="nameField" class="hidden">
+        <label for="name">Full name</label>
+        <input id="name" type="text" maxlength="80" autocomplete="name">
+      </div>
+
+      <label for="email">Email address</label>
+      <input id="email" type="email" required maxlength="254"
+             autocomplete="email" placeholder="you@example.com">
+
+      <label for="password">Password</label>
+      <input id="password" type="password" required minlength="8"
+             autocomplete="current-password" placeholder="At least 8 characters">
+
+      <button id="submitButton" type="submit">Log In</button>
+    </form>
+
+    <div class="switch">
+      <span id="switchText">Don't have an account?</span>
+      <a id="switchMode" href="#">Create account</a>
+    </div>
+
+    <p id="message" role="status" aria-live="polite"></p>
+  </main>
+
+  <script>
+    const form = document.getElementById("authForm");
+    const nameField = document.getElementById("nameField");
+    const nameInput = document.getElementById("name");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const submitButton = document.getElementById("submitButton");
+    const subtitle = document.getElementById("subtitle");
+    const switchText = document.getElementById("switchText");
+    const switchMode = document.getElementById("switchMode");
+    const message = document.getElementById("message");
+    function showMessage(text = "", type = "") {
+    message.textContent = text;
+    message.className = "";
+
+    if (type === "error") {
+        message.classList.add("error");
+    } else if (type === "success") {
+        message.classList.add("success");
+    }
+}
+
+    let isRegistering = false;
+
+    let deviceFingerprint = localStorage.getItem("connectroom_device_fingerprint");
+
+    if (!deviceFingerprint) {
+    deviceFingerprint = crypto.randomUUID() + "-" + crypto.randomUUID();
+    localStorage.setItem("connectroom_device_fingerprint", deviceFingerprint);
+    }
+    switchMode.addEventListener("click", (event) => {
+      event.preventDefault();
+      isRegistering = !isRegistering;
+
+      nameField.classList.toggle("hidden", !isRegistering);
+      nameInput.required = isRegistering;
+      passwordInput.minLength = 8;
+      passwordInput.autocomplete = isRegistering
+        ? "new-password"
+        : "current-password";
+
+      submitButton.textContent = isRegistering
+        ? "Create Account" : "Log In";
+
+      subtitle.textContent = isRegistering
+        ? "Create an account to start using ConnectRoom."
+        : "Sign in to join your video meetings.";
+
+      switchText.textContent = isRegistering
+        ? "Already have an account?" : "Don't have an account?";
+
+      switchMode.textContent = isRegistering ? "Log in" : "Create account";
+      showMessage();
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const email = emailInput.value.trim().toLowerCase();
+      const password = passwordInput.value;
+      const username = nameInput.value.trim();
+
+      if (isRegistering && !username) {
+        showMessage("Please enter your full name.", "error");
+        return;
+      }
+
+      if (password.length < 8) {
+        showMessage("Password must contain at least 8 characters.", "error");
+        return;
+      }
+
+      submitButton.disabled = true;
+      showMessage("Please wait...");
+
+      try {
+        const endpoint = isRegistering ? "/api/register" : "/api/login";
+
+        // Match the field names expected by server.js.
+        
+       const body = isRegistering
+       ? { name: username, email, password }
+       : { email, password, deviceFingerprint };
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        let data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.message || "Request failed.");
+        }
+        if (!isRegistering && data.otpRequired) {
+    const otp = prompt(
+        "Enter the verification code sent to " + data.emailMasked
+    );
+
+    if (!otp) {
+        throw new Error("OTP verification cancelled.");
+    }
+
+    const verifyResponse = await fetch("/api/login/verify-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            challengeId: data.challengeId,
+            otp: otp.trim(),
+            deviceFingerprint
+        })
+    });
+
+    data = await verifyResponse.json();
+
+    if (!verifyResponse.ok) {
+        throw new Error(data.message || "OTP verification failed.");
+    }
+}
+
+        // Registration creates the account; then ask the user to log in.
+        if (isRegistering) {
+          showMessage(
+            "Account created successfully! Please log in.",
+            "success"
+          );
+
+          isRegistering = false;
+          nameField.classList.add("hidden");
+          nameInput.required = false;
+          passwordInput.value = "";
+          passwordInput.autocomplete = "current-password";
+          submitButton.textContent = "Log In";
+          subtitle.textContent = "Sign in to join your video meetings.";
+          switchText.textContent = "Don't have an account?";
+          switchMode.textContent = "Create account";
+          return;
+        }
+
+        if (!data.token) {
+          throw new Error("The server did not return a login token.");
+        }
+
+        localStorage.setItem("token", data.token);
+
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+
+        showMessage("Login successful. Opening dashboard...", "success");
+
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get("next");
+
+        if (next && next.startsWith("/") && !next.startsWith("//")) {
+          window.location.href = next;
+        } else {
+          window.location.href = "/dashboard.html";
+        }
+      } catch (error) {
+        showMessage(error.message || "Could not connect to server.", "error");
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

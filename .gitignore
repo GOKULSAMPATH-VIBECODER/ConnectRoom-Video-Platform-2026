@@ -1,0 +1,15 @@
+node_modules/
+**/node_modules/
+.env
+.env.*
+!.env.example
+uploads/
+private-uploads/
+dist/
+build/
+*.log
+
+# Backup files
+*.backup
+*.step*-backup
+*.before-restore-*

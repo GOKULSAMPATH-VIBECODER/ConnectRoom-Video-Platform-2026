@@ -1,0 +1,879 @@
+
+"use strict";
+
+// ==================================================
+// CONNECTROOM - VIDEO MEETING CLIENT
+// ==================================================
+
+// Read login details BEFORE connecting Socket.IO.
+const token = localStorage.getItem("token");
+
+let savedUser = null;
+
+try {
+    savedUser = JSON.parse(localStorage.getItem("user") || "null");
+} catch {
+    savedUser = null;
+}
+
+const params = new URLSearchParams(window.location.search);
+const roomId = params.get("room");
+
+if (!token) {
+    window.location.replace("/login.html");
+    throw new Error("Login required.");
+}
+
+if (!roomId) {
+    alert("Meeting room ID is missing.");
+    window.location.replace("/dashboard.html");
+    throw new Error("Meeting room ID is missing.");
+}
+
+// IMPORTANT: authenticate the socket with the saved JWT.
+const socket = io({
+    auth: {
+        token: token
+    }
+});
+
+// ==================================================
+// WEBRTC CONFIGURATION
+// ==================================================
+
+const peerConfiguration = {
+    iceServers: [
+        {
+            urls: "stun:stun.l.google.com:19302"
+        }
+    ]
+};
+
+// ==================================================
+// APPLICATION STATE
+// ==================================================
+
+let localStream = null;
+let screenStream = null;
+let screenSharing = false;
+let micEnabled = true;
+let cameraEnabled = true;
+let isLeaving = false;
+
+const peers = new Map();
+const remoteUsers = new Map();
+
+// ==================================================
+// VIDEO CONTAINER
+// ==================================================
+
+let videoContainer =
+    document.getElementById("videoGrid") ||
+    document.getElementById("videos") ||
+    document.getElementById("videoContainer");
+
+if (!videoContainer) {
+    videoContainer = document.createElement("div");
+    videoContainer.id = "videoGrid";
+
+    Object.assign(videoContainer.style, {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+        gap: "12px",
+        padding: "16px"
+    });
+
+    document.body.appendChild(videoContainer);
+}
+
+function createVideoElement(id, label) {
+    let video = document.getElementById(id);
+
+    if (video) {
+        return video;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.dataset.videoWrapper = id;
+
+    Object.assign(wrapper.style, {
+        background: "#151515",
+        borderRadius: "12px",
+        overflow: "hidden",
+        minWidth: "0"
+    });
+
+    const title = document.createElement("div");
+    title.textContent = label;
+
+    Object.assign(title.style, {
+        color: "white",
+        padding: "8px",
+        fontSize: "14px"
+    });
+
+    video = document.createElement("video");
+    video.id = id;
+    video.autoplay = true;
+    video.playsInline = true;
+
+    Object.assign(video.style, {
+        width: "100%",
+        display: "block",
+        minHeight: "160px",
+        background: "#222",
+        objectFit: "contain"
+    });
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(video);
+    videoContainer.appendChild(wrapper);
+
+    return video;
+}
+
+const localVideo = createVideoElement("localVideo", "You");
+localVideo.muted = true;
+
+// ==================================================
+// CAMERA AND MICROPHONE
+// ==================================================
+
+async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        console.error("Camera access requires localhost or HTTPS.");
+        return false;
+    }
+
+    if (
+        localStream &&
+        localStream.getTracks().some(track => track.readyState === "live")
+    ) {
+        return true;
+    }
+
+    const requests = [
+        {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 360 },
+                frameRate: { ideal: 24, max: 30 }
+            },
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+        },
+        {
+            video: true,
+            audio: false
+        },
+        {
+            video: false,
+            audio: true
+        }
+    ];
+
+    let lastError = null;
+
+    for (const constraints of requests) {
+        try {
+            localStream =
+                await navigator.mediaDevices.getUserMedia(constraints);
+            break;
+        } catch (error) {
+            lastError = error;
+            console.warn(
+                "Media request failed; trying fallback:",
+                error.name,
+                error.message
+            );
+        }
+    }
+
+    if (!localStream) {
+        console.error("Could not open media devices:", lastError);
+
+        alert(
+            "ConnectRoom could not open your camera or microphone.\n\n" +
+            "Check Chrome site permissions and Windows camera privacy settings. " +
+            "Close other apps that may be using your webcam.\n\n" +
+            "Error: " + (lastError?.name || "Unknown") +
+            "\n" + (lastError?.message || "")
+        );
+
+        return false;
+    }
+
+    localVideo.srcObject = localStream;
+    localVideo.muted = true;
+
+    await localVideo.play().catch(error => {
+        console.warn("Local preview needs interaction:", error);
+    });
+
+    micEnabled = localStream.getAudioTracks().length > 0;
+    cameraEnabled = localStream.getVideoTracks().length > 0;
+
+    // Add local tracks to any existing peer connections.
+    for (const pc of peers.values()) {
+        for (const track of localStream.getTracks()) {
+            const exists = pc.getSenders().some(
+                sender => sender.track?.kind === track.kind
+            );
+
+            if (!exists) {
+                pc.addTrack(track, localStream);
+            }
+        }
+    }
+
+    console.log("Local media initialized:", {
+        camera: cameraEnabled,
+        microphone: micEnabled
+    });
+
+    return true;
+}
+
+// ==================================================
+// PARTICIPANT COUNT
+// ==================================================
+
+function updateParticipantCount(users) {
+    const count = Array.isArray(users) ? users.length : remoteUsers.size + 1;
+
+    const elements = [
+        document.getElementById("participantCount"),
+        document.getElementById("participantsCount"),
+        document.getElementById("participant-count")
+    ].filter(Boolean);
+
+    for (const element of elements) {
+        element.textContent = `${count} / 10 Participants`;
+    }
+}
+
+// ==================================================
+// WEBRTC PEER CONNECTION
+// ==================================================
+
+function createPeerConnection(remoteSocketId) {
+    if (peers.has(remoteSocketId)) {
+        return peers.get(remoteSocketId);
+    }
+
+    const pc = new RTCPeerConnection(peerConfiguration);
+
+    peers.set(remoteSocketId, pc);
+
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+        });
+    }
+
+    pc.onicecandidate = event => {
+        if (event.candidate) {
+            socket.emit("ice-candidate", {
+                target: remoteSocketId,
+                candidate: event.candidate
+            });
+        }
+    };
+
+    pc.ontrack = event => {
+        const user = remoteUsers.get(remoteSocketId);
+        const label = user?.name || "Meeting participant";
+
+        const remoteVideo = createVideoElement(
+            "remoteVideo-" + remoteSocketId,
+            label
+        );
+
+        remoteVideo.muted = false;
+
+        if (event.streams?.[0]) {
+            remoteVideo.srcObject = event.streams[0];
+
+            remoteVideo.play().catch(error => {
+                console.warn("Remote playback needs interaction:", error);
+            });
+        }
+    };
+
+    pc.onconnectionstatechange = () => {
+        console.log(
+            "Connection with",
+            remoteSocketId,
+            ":",
+            pc.connectionState
+        );
+
+        if (pc.connectionState === "failed") {
+            console.warn(
+                "WebRTC connection failed. A TURN server may be required " +
+                "for some networks."
+            );
+        }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+        console.log(
+            "ICE connection with",
+            remoteSocketId,
+            ":",
+            pc.iceConnectionState
+        );
+    };
+
+    return pc;
+}
+
+// ==================================================
+// CREATE AND SEND AN OFFER
+// ==================================================
+
+async function callParticipant(remoteSocketId) {
+    try {
+        if (!remoteSocketId || remoteSocketId === socket.id) {
+            return;
+        }
+
+        const pc = createPeerConnection(remoteSocketId);
+
+        if (pc.signalingState !== "stable") {
+            return;
+        }
+
+        const offer = await pc.createOffer();
+
+        await pc.setLocalDescription(offer);
+
+        socket.emit("offer", {
+            target: remoteSocketId,
+            offer: pc.localDescription
+        });
+    } catch (error) {
+        console.error("Could not create offer:", error);
+    }
+}
+
+// ==================================================
+// RECEIVE AN OFFER
+// ==================================================
+
+socket.on("offer", async data => {
+    try {
+        if (!data?.from || !data.offer) {
+            return;
+        }
+
+        remoteUsers.set(
+            data.from,
+            data.user || remoteUsers.get(data.from) || {}
+        );
+
+        const pc = createPeerConnection(data.from);
+
+        await pc.setRemoteDescription(
+            new RTCSessionDescription(data.offer)
+        );
+
+        const answer = await pc.createAnswer();
+
+        await pc.setLocalDescription(answer);
+
+        socket.emit("answer", {
+            target: data.from,
+            answer: pc.localDescription
+        });
+    } catch (error) {
+        console.error("Could not process offer:", error);
+    }
+});
+
+// ==================================================
+// RECEIVE AN ANSWER
+// ==================================================
+
+socket.on("answer", async data => {
+    try {
+        if (!data?.from || !data.answer) {
+            return;
+        }
+
+        const pc = peers.get(data.from);
+
+        if (pc && pc.signalingState === "have-local-offer") {
+            await pc.setRemoteDescription(
+                new RTCSessionDescription(data.answer)
+            );
+        }
+    } catch (error) {
+        console.error("Could not process answer:", error);
+    }
+});
+
+// ==================================================
+// RECEIVE ICE CANDIDATES
+// ==================================================
+
+socket.on("ice-candidate", async data => {
+    try {
+        if (!data?.from || !data.candidate) {
+            return;
+        }
+
+        const pc = peers.get(data.from);
+
+        if (pc && pc.remoteDescription) {
+            await pc.addIceCandidate(
+                new RTCIceCandidate(data.candidate)
+            );
+        }
+    } catch (error) {
+        console.error("Could not add ICE candidate:", error);
+    }
+});
+
+// ==================================================
+// JOIN ROOM
+// ==================================================
+
+socket.on("connect", async () => {
+    console.log("Connected to signaling server:", socket.id);
+
+    await startCamera();
+
+    if (isLeaving || !socket.connected) {
+        return;
+    }
+
+    socket.emit("join-room", {
+        roomId: roomId,
+        token: token,
+        userName: savedUser?.name || "User"
+    });
+
+    console.log("Joining meeting room:", roomId);
+});
+
+socket.on("room-users", async users => {
+    if (!Array.isArray(users)) {
+        return;
+    }
+
+    for (const user of users) {
+        const remoteSocketId = user.socketId;
+
+        if (!remoteSocketId || remoteSocketId === socket.id) {
+            continue;
+        }
+
+        remoteUsers.set(remoteSocketId, user);
+        await callParticipant(remoteSocketId);
+    }
+
+    updateParticipantCount();
+});
+
+socket.on("user-joined", async data => {
+    if (!data?.socketId || data.socketId === socket.id) {
+        return;
+    }
+
+    remoteUsers.set(
+        data.socketId,
+        data.user || { name: "Participant" }
+    );
+
+    console.log(
+        "Participant joined:",
+        data.user?.name || data.socketId
+    );
+
+    updateParticipantCount();
+
+    // Existing participants initiate a connection to the new participant.
+    await callParticipant(data.socketId);
+});
+
+socket.on("participants-updated", users => {
+    if (!Array.isArray(users)) {
+        return;
+    }
+
+    console.log("Participants updated:", users);
+
+    for (const user of users) {
+        if (user.socketId && user.socketId !== socket.id) {
+            remoteUsers.set(user.socketId, user);
+        }
+    }
+
+    updateParticipantCount(users);
+});
+
+socket.on("user-left", data => {
+    if (!data?.socketId) {
+        return;
+    }
+
+    const remoteSocketId = data.socketId;
+    const pc = peers.get(remoteSocketId);
+
+    if (pc) {
+        pc.close();
+        peers.delete(remoteSocketId);
+    }
+
+    remoteUsers.delete(remoteSocketId);
+
+    const remoteVideo = document.getElementById(
+        "remoteVideo-" + remoteSocketId
+    );
+
+    if (remoteVideo) {
+        const wrapper = remoteVideo.closest("[data-video-wrapper]");
+
+        if (wrapper) {
+            wrapper.remove();
+        } else {
+            remoteVideo.remove();
+        }
+    }
+
+    updateParticipantCount();
+});
+
+socket.on("room-error", message => {
+    alert(message || "Unable to join this meeting.");
+});
+
+socket.on("connect_error", error => {
+    console.error("Socket connection error:", error.message);
+
+    if (error.message.includes("Authentication")) {
+        alert(
+            "Your login session may have expired. Please log in again."
+        );
+    }
+});
+
+// ==================================================
+// BUTTON HELPERS
+// ==================================================
+
+function findButton(ids, keywords) {
+    for (const id of ids) {
+        const element = document.getElementById(id);
+
+        if (element) {
+            return element;
+        }
+    }
+
+    return Array.from(document.querySelectorAll("button")).find(button => {
+        const text = (
+            button.innerText ||
+            button.textContent ||
+            button.getAttribute("aria-label") ||
+            ""
+        ).toLowerCase();
+
+        return keywords.some(keyword => text.includes(keyword));
+    });
+}
+
+// ==================================================
+// MICROPHONE BUTTON
+// ==================================================
+
+const micButton = findButton(
+    ["micBtn", "muteBtn", "toggleMic", "microphoneBtn"],
+    ["mute microphone", "mute mic", "unmute microphone"]
+);
+
+if (micButton) {
+    micButton.addEventListener("click", () => {
+        const track = localStream?.getAudioTracks()[0];
+
+        if (!track) {
+            alert("No microphone is available.");
+            return;
+        }
+
+        micEnabled = !micEnabled;
+        track.enabled = micEnabled;
+
+        micButton.textContent = micEnabled
+            ? "Mute Microphone"
+            : "Unmute Microphone";
+    });
+}
+
+// ==================================================
+// CAMERA BUTTON
+// ==================================================
+
+const cameraButton = findButton(
+    ["cameraBtn", "toggleCamera", "videoBtn"],
+    ["turn camera off", "turn camera on", "camera off", "camera on"]
+);
+
+if (cameraButton) {
+    cameraButton.addEventListener("click", () => {
+        const track = localStream?.getVideoTracks()[0];
+
+        if (!track) {
+            alert("No camera is available.");
+            return;
+        }
+
+        cameraEnabled = !cameraEnabled;
+        track.enabled = cameraEnabled;
+
+        cameraButton.textContent = cameraEnabled
+            ? "Turn Camera Off"
+            : "Turn Camera On";
+    });
+}
+
+// ==================================================
+// SCREEN SHARING
+// ==================================================
+
+const screenButton = findButton(
+    ["screenBtn", "shareScreenBtn", "screenShareBtn"],
+    ["share screen", "screen share", "stop sharing"]
+);
+
+async function startScreenSharing() {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+        alert(
+            "Screen sharing is unavailable. Use localhost or HTTPS " +
+            "in a supported browser."
+        );
+        return;
+    }
+
+    try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: false
+        });
+
+        const screenTrack = screenStream.getVideoTracks()[0];
+
+        if (!screenTrack) {
+            screenStream.getTracks().forEach(track => track.stop());
+            screenStream = null;
+            return;
+        }
+
+        // Replace the camera track for every existing participant.
+        for (const pc of peers.values()) {
+            let sender = pc.getSenders().find(
+                item => item.track?.kind === "video"
+            );
+
+            if (sender) {
+                await sender.replaceTrack(screenTrack);
+            } else {
+                pc.addTrack(screenTrack, screenStream);
+            }
+        }
+
+        localVideo.srcObject = screenStream;
+        await localVideo.play().catch(() => {});
+
+        screenSharing = true;
+
+        if (screenButton) {
+            screenButton.textContent = "Stop Sharing";
+        }
+
+        screenTrack.onended = () => {
+            stopScreenSharing();
+        };
+
+        console.log("Screen sharing started.");
+    } catch (error) {
+        console.error("Screen sharing error:", error);
+
+        if (error.name !== "NotAllowedError") {
+            alert("Could not share your screen: " + error.message);
+        }
+
+        screenStream?.getTracks().forEach(track => track.stop());
+        screenStream = null;
+    }
+}
+
+async function stopScreenSharing() {
+    if (!screenSharing) {
+        return;
+    }
+
+    const oldScreenStream = screenStream;
+
+    screenSharing = false;
+    screenStream = null;
+
+    oldScreenStream?.getTracks().forEach(track => track.stop());
+
+    const cameraTrack = localStream?.getVideoTracks()[0];
+
+    for (const pc of peers.values()) {
+        const sender = pc.getSenders().find(
+            item => item.track?.kind === "video"
+        );
+
+        if (sender && cameraTrack) {
+            await sender.replaceTrack(cameraTrack);
+        } else if (sender && !cameraTrack) {
+            await sender.replaceTrack(null);
+        }
+    }
+
+    localVideo.srcObject = localStream;
+
+    if (screenButton) {
+        screenButton.textContent = "Share Screen";
+    }
+
+    console.log("Screen sharing stopped.");
+}
+
+if (screenButton) {
+    screenButton.addEventListener("click", async () => {
+        if (screenSharing) {
+            await stopScreenSharing();
+        } else {
+            await startScreenSharing();
+        }
+    });
+}
+
+// ==================================================
+// CHAT
+// ==================================================
+
+const chatInput =
+    document.getElementById("chatInput") ||
+    document.getElementById("messageInput");
+
+const chatButton =
+    document.getElementById("sendMessageBtn") ||
+    document.getElementById("sendBtn");
+
+const chatMessages =
+    document.getElementById("chatMessages") ||
+    document.getElementById("messages");
+
+function sendChatMessage() {
+    if (!chatInput) {
+        return;
+    }
+
+    const message = chatInput.value.trim();
+
+    if (!message) {
+        return;
+    }
+
+    socket.emit("chat-message", {
+        message: message
+    });
+
+    chatInput.value = "";
+}
+
+if (chatButton) {
+    chatButton.addEventListener("click", sendChatMessage);
+}
+
+if (chatInput) {
+    chatInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            sendChatMessage();
+        }
+    });
+}
+
+socket.on("chat-message", data => {
+    if (!chatMessages || !data) {
+        return;
+    }
+
+    const line = document.createElement("p");
+    const name = data.user?.name || "Participant";
+
+    // textContent prevents message text from being treated as HTML.
+    line.textContent = name + ": " + data.message;
+
+    chatMessages.appendChild(line);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
+// ==================================================
+// LEAVE MEETING
+// ==================================================
+
+const leaveButton = findButton(
+    ["leaveBtn", "leaveMeetingBtn", "endCallBtn"],
+    ["leave meeting", "leave call", "end call"]
+);
+
+function leaveMeeting() {
+    if (isLeaving) {
+        return;
+    }
+
+    isLeaving = true;
+
+    socket.emit("leave-room");
+
+    for (const pc of peers.values()) {
+        pc.close();
+    }
+
+    peers.clear();
+    remoteUsers.clear();
+
+    localStream?.getTracks().forEach(track => track.stop());
+    screenStream?.getTracks().forEach(track => track.stop());
+
+    localStream = null;
+    screenStream = null;
+
+    socket.disconnect();
+
+    window.location.href = "/dashboard.html";
+}
+
+if (leaveButton) {
+    leaveButton.addEventListener("click", leaveMeeting);
+}
+
+// ==================================================
+// CLEANUP
+// ==================================================
+
+window.addEventListener("beforeunload", () => {
+    socket.emit("leave-room");
+
+    for (const pc of peers.values()) {
+        pc.close();
+    }
+
+    localStream?.getTracks().forEach(track => track.stop());
+    screenStream?.getTracks().forEach(track => track.stop());
+});
+
+console.log("ConnectRoom WebRTC client loaded.");
+console.log("Meeting room:", roomId);
+console.log("STUN configured. TURN may be needed on some networks.");
